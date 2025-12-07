@@ -7,7 +7,7 @@
 #include <vector>
 #include <cmath>
 
-const double PI{3.14159265358979323846};
+constexpr double PI{3.14159265358979323846};
 
 struct Vertex{
     float x;
@@ -59,7 +59,7 @@ int main()
 
     /*** defining the vertex coordinates for drawing the circle ***/
     int res{100}; // use 100 triangles to draw circle
-    float radius{0.5};
+    float radius{0.05};
     float centre_x{0.0f};
     float centre_y{0.0f};
 
@@ -90,10 +90,13 @@ int main()
     const std::string vertexShaderSource = R"glsl(
     #version 330 core
     
-    layout(location=0) in vec4 position;
+    // input of a 2d vector called position in location 0. It has type float by default (dvecn for double)
+    layout(location=0) in vec2 position;
+
+    uniform mat4 transformation;
     
     void main(){
-        gl_Position = position;
+        gl_Position = transformation*vec4(position, 0.0, 1.0);
     }
     )glsl";
 
@@ -137,9 +140,28 @@ int main()
 
     GLCall(glUseProgram(program));
 
+    GLCall(int location = glGetUniformLocation(program, "transformation"));
+    ASSERT(location != -1);
+
+    float transformation[4][4] { {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
+
+    // GL_FALSE for column major order
+    float* mat_ptr{ transformation[0] };
+    GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr));
+
+    float delta_y{0.0001f};
+    float y_loc{0};
+
     while (!glfwWindowShouldClose(window))
     {
+        glClear(GL_COLOR_BUFFER_BIT);
+        transformation[3][1] = y_loc;
+        GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr));
         GLCall(glDrawArrays(GL_TRIANGLE_FAN, 0, res+2));
+
+        if(y_loc < -1) delta_y=0;
+        y_loc -= delta_y;
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     };
