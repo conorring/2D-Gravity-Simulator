@@ -3,9 +3,11 @@
 
 #include "Renderer.h"
 
-#include <iostream>
-#include <vector>
 #include <cmath>
+#include <iostream>
+#include <string>
+#include <vector>
+
 
 constexpr double PI{3.14159265358979323846};
 
@@ -26,8 +28,8 @@ std::vector<Vertex> generateVertices(int res, float radius, float x, float y)
     // less than or equal to include first point again for full circle
     for(k=0; k<res+1; k++)
     {
-        x1 = radius*cos(2*PI*k / res) + x;
-        y1 = radius*sin(2*PI*k / res) + y; 
+        x1 = radius*std::cos(2*PI*k / res) + x;
+        y1 = radius*std::sin(2*PI*k / res) + y; 
         vertices.push_back({x1, y1}); 
     }
 
@@ -37,6 +39,8 @@ std::vector<Vertex> generateVertices(int res, float radius, float x, float y)
 int main()
 {
 
+    /****************** window intialisation etc etc  *************************/
+    
     // declare the window object
     GLFWwindow* window;
 
@@ -57,6 +61,8 @@ int main()
 
     if(glewInit() != GLEW_OK) std::cout << "Error initialising GLEW" << std::endl;
 
+    /******************* done with setting up window stuff *********************/
+
     /*** defining the vertex coordinates for drawing the circle ***/
     int res{100}; // use 100 triangles to draw circle
     float radius{0.05};
@@ -64,79 +70,38 @@ int main()
     float centre_y{0.0f};
 
     std::vector<Vertex> vertices{generateVertices(res, radius, centre_x, centre_y)};
+    std::vector<Vertex> vertices_2{generateVertices(100, 0.05, 0.5f, -0.5f)};
 
     // generate and bind the vao
     GLuint vao;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
+    GLuint vao_2;
+    glGenVertexArrays(1, &vao_2);
+    // glBindVertexArray(vao_2); done below when reading in info for the second object
+
+
     /*** creating the vertex buffer object ***/
+    // vao 1
     GLuint vbo;     // will store the vertex buffer id
     GLCall(glGenBuffers(1, &vbo));      // generate the buffer and write the id to vbo (&vbo is the address of vbo)
     GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo)); // binds the buffer to the vertex target buffer
     GLCall(glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(Vertex), vertices.data(), GL_STATIC_DRAW));
-
     GLCall(glEnableVertexAttribArray(0));
-
     GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0));
 
-    /***  create program and attach and compile shaders ***/
+    // vao 2
+    GLuint vbo_2;     // will store the vertex buffer id
+    GLCall(glGenBuffers(1, &vbo_2));      // generate the buffer and write the id to vbo (&vbo is the address of vbo)
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo_2)); // binds the buffer to the vertex target buffer
+    GLCall(glBufferData(GL_ARRAY_BUFFER, vertices_2.size()*sizeof(Vertex), vertices_2.data(), GL_STATIC_DRAW));
 
-    // create program and shader object
-    GLuint program{glCreateProgram()};
-    GLuint vshader{glCreateShader(GL_VERTEX_SHADER)};
+    GLCall(glBindVertexArray(vao_2)); // now need to bind vao number 2
+    GLCall(glEnableVertexAttribArray(0));
+    GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0));
 
-    // define shader source code
-    const std::string vertexShaderSource = R"glsl(
-    #version 330 core
-    
-    // input of a 2d vector called position in location 0. It has type float by default (dvecn for double)
-    layout(location=0) in vec2 position;
-
-    uniform mat4 transformation;
-    
-    void main(){
-        gl_Position = transformation*vec4(position, 0.0, 1.0);
-    }
-    )glsl";
-
-    // convert source code to c style string so we can easily pass to glShaderSource
-    const char* src{vertexShaderSource.c_str()};
-
-    // place the source code in the shader object
-    GLCall(glShaderSource(vshader, 1, &src, nullptr));
-
-    // compile the source code in the shader with id vshader
-    GLCall(glCompileShader(vshader));
-
-    // writes the compile status of the source code to result
-    // used for catching compilation errors
-    int result;
-    glGetShaderiv(vshader, GL_COMPILE_STATUS, &result);
-
-    // if compilation fails write the error log message
-    if (result == GL_FALSE)
-    {
-        // get the lenght of the log message to define message and store it there
-        int length;
-        glGetShaderiv(vshader, GL_INFO_LOG_LENGTH, &length);
-
-        // alloca is useful for allocating memory for the char array when the length is determined at runtime
-        char* message = (char*)alloca(length * sizeof(char));
-
-        // writes the log to message
-        glGetShaderInfoLog(vshader, length, &length, message);
-        std::cout << "Failed to compile vertex shader";
-        std::cout << message << std::endl;
-
-        // deletes the shader
-        glDeleteShader(vshader); 
-    }
-
-    GLCall(glAttachShader(program, vshader));
-    GLCall(glLinkProgram(program));
-    GLCall(glValidateProgram(program));
-    glDeleteShader(vshader);
+    GLuint program{create_program("res/shaders/Body.shader")};
 
     GLCall(glUseProgram(program));
 
@@ -157,7 +122,13 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         transformation[3][1] = y_loc;
         GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr));
+
+        GLCall(glBindVertexArray(vao));
         GLCall(glDrawArrays(GL_TRIANGLE_FAN, 0, res+2));
+
+        GLCall(glBindVertexArray(vao_2));
+        GLCall(glDrawArrays(GL_TRIANGLE_FAN, 0, res+2));
+
 
         if(y_loc < -1) delta_y=0;
         y_loc -= delta_y;

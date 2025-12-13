@@ -2,8 +2,8 @@ CXX := g++							# cpp compiler
 # compiler flags: -Wall and -Wextra for extra compiler warnings
 # -g builds executable with debugging symbols
 # -O0 makes the compiler not optimize code at all 
-CXXFLAGS := -Wall -Wextra -g -O0    
-LDFLAGS := -lGLEW -lGL -lglfw		# library flags for linking
+CXXFLAGS := -Wall -Wextra -g -O0 -Iinclude	   
+LDFLAGS := -lGLEW -lGL -lglfw 	# library flags for linking
 
 SRC_DIR := src
 BIN_DIR := bin
