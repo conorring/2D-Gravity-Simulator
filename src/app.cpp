@@ -2,39 +2,12 @@
 #include <GLFW/glfw3.h>     // manage windowing env
 
 #include "Renderer.h"
+#include "Shader.h"
 
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
-
-
-constexpr double PI{3.14159265358979323846};
-
-struct Vertex{
-    float x;
-    float y;
-};
-
-// res is how many triangles we want to use to approximate the circle
-std::vector<Vertex> generateVertices(int res, float radius, float x, float y)
-{
-    std::vector<Vertex> vertices;
-    vertices.push_back({x, y}); // add centre of circle
-    
-    int k;
-    float x1, y1;
-
-    // less than or equal to include first point again for full circle
-    for(k=0; k<res+1; k++)
-    {
-        x1 = radius*std::cos(2*PI*k / res) + x;
-        y1 = radius*std::sin(2*PI*k / res) + y; 
-        vertices.push_back({x1, y1}); 
-    }
-
-    return vertices;
-}
 
 int main()
 {
@@ -102,7 +75,6 @@ int main()
     GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0));
 
     GLuint program{create_program("res/shaders/Body.shader")};
-
     GLCall(glUseProgram(program));
 
     GLCall(int location = glGetUniformLocation(program, "transformation"));
@@ -110,9 +82,9 @@ int main()
 
     float transformation[4][4] { {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
 
-    // GL_FALSE for column major order
+    
     float* mat_ptr{ transformation[0] };
-    GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr));
+    GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr)); // GL_FALSE for column major order
 
     float delta_y{0.0001f};
     float y_loc{0};

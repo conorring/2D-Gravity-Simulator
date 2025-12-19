@@ -4,7 +4,7 @@
 #include <GL/glew.h>
 
 #include <csignal>
-#include <string>
+#include <vector>
 
 #define ASSERT(x) if (!(x)) raise(SIGTRAP);
 #define GLCall(x) GLClearError();\
@@ -16,22 +16,13 @@
 void GLClearError();
 bool GLLogCall(const char* function, const char* file, int line);
 
+constexpr double PI{3.14159265358979323846};
 
-
-/********************************************************************/
-/*   functionality for creating a program from shader source code   */
-/********************************************************************/
-
-// used to return multiple strings from parse_shader_source
-// for now we only use vertex and fragment shader
-struct ShaderSource
-{
-    const std::string vertex_source;
-    const std::string fragment_source;
+struct Vertex{
+    float x;
+    float y;
 };
 
-ShaderSource parse_shader_source(const std::string& filepath);
-GLuint compile_shader(GLuint shader_type, const std::string& source);
-GLuint create_program(const std::string& filepath);
+std::vector<Vertex> generateVertices(int, float, float, float);
 
 #endif
