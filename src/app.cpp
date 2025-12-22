@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+//#define DEBUG
+
+constexpr float DT{0.001};
+
 int main()
 {
 
@@ -36,43 +40,32 @@ int main()
 
     /******************* done with setting up window stuff *********************/
 
-    /*** defining the vertex coordinates for drawing the circle ***/
-    int res{100}; // use 100 triangles to draw circle
-    float radius{0.05};
-    float centre_x{0.0f};
-    float centre_y{0.0f};
+    System system;
 
-    std::vector<Vertex> vertices{generateVertices(res, radius, centre_x, centre_y)};
-    std::vector<Vertex> vertices_2{generateVertices(100, 0.05, 0.5f, -0.5f)};
+    // fix at centre
+    Body sun(1000, 0.0f);
+    Body earth(1, 0.0f, {0.75f, -0.5f}, {0.0f, 1.0f});  
+    Body earth2(1, 0.0f, {-0.75f, 0.5f}, {0.0f, -1.0f});
 
-    // generate and bind the vao
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    GLuint sun_vao{create_body_vao(0.1f)};
+    GLuint earth_vao{create_body_vao(0.05f)};
 
-    GLuint vao_2;
-    glGenVertexArrays(1, &vao_2);
-    // glBindVertexArray(vao_2); done below when reading in info for the second object
+    sun.set_vao(sun_vao);
+    earth.set_vao(earth_vao);
+    earth2.set_vao(earth_vao);
 
+    #ifdef DEBUG
+    std::cout << sun.get_vao() << std::endl;
+    std::cout << earth.get_vao() << std::endl;
+    #endif
 
-    /*** creating the vertex buffer object ***/
-    // vao 1
-    GLuint vbo;     // will store the vertex buffer id
-    GLCall(glGenBuffers(1, &vbo));      // generate the buffer and write the id to vbo (&vbo is the address of vbo)
-    GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo)); // binds the buffer to the vertex target buffer
-    GLCall(glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(Vertex), vertices.data(), GL_STATIC_DRAW));
-    GLCall(glEnableVertexAttribArray(0));
-    GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0));
+    system.add_body(sun);
+    system.add_body(earth);
+    system.add_body(earth2);
 
-    // vao 2
-    GLuint vbo_2;     // will store the vertex buffer id
-    GLCall(glGenBuffers(1, &vbo_2));      // generate the buffer and write the id to vbo (&vbo is the address of vbo)
-    GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo_2)); // binds the buffer to the vertex target buffer
-    GLCall(glBufferData(GL_ARRAY_BUFFER, vertices_2.size()*sizeof(Vertex), vertices_2.data(), GL_STATIC_DRAW));
-
-    GLCall(glBindVertexArray(vao_2)); // now need to bind vao number 2
-    GLCall(glEnableVertexAttribArray(0));
-    GLCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, 0));
+    #ifdef DEBUG
+    std::cout << system.particles.size();
+    #endif
 
     GLuint program{create_program("res/shaders/Body.shader")};
     GLCall(glUseProgram(program));
@@ -86,24 +79,12 @@ int main()
     float* mat_ptr{ transformation[0] };
     GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr)); // GL_FALSE for column major order
 
-    float delta_y{0.0001f};
-    float y_loc{0};
-
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
-        transformation[3][1] = y_loc;
-        GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr));
 
-        GLCall(glBindVertexArray(vao));
-        GLCall(glDrawArrays(GL_TRIANGLE_FAN, 0, res+2));
-
-        GLCall(glBindVertexArray(vao_2));
-        GLCall(glDrawArrays(GL_TRIANGLE_FAN, 0, res+2));
-
-
-        if(y_loc < -1) delta_y=0;
-        y_loc -= delta_y;
+        system.draw_system(&transformation[0], location);
+        system.update_system(DT);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

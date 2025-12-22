@@ -1,7 +1,11 @@
 #ifndef BODY_H
 #define BODY_H
 
+#include <GL/glew.h>
+
 #include <vector>
+
+constexpr float GRAVITATION_CONSTANT{6.6743e10-11};
 
 struct Position
 {
@@ -18,6 +22,7 @@ class Body
     private:
         const float m_mass;
         const float m_radius;
+        GLuint m_vao;
 
     public:
         Body(float mass, float radius, Position position={0.0f, 0.0f}, Velocity velocity={0.0f, 0.0f});
@@ -25,6 +30,10 @@ class Body
         // getters
         float get_mass() {return m_mass;}
         float get_radius() {return m_radius;}
+        unsigned int get_vao() {return m_vao;}
+
+        // setters
+        void set_vao(GLuint vao) {m_vao = vao;}
 
         Position m_position;
         Velocity m_velocity;
@@ -38,11 +47,13 @@ class Body
 class System
 {
     private:
-        std::vector<Body> particles;
-
+        
     public:
         void add_body(Body&);
         void update_system(float dt);
+        void draw_system(float (*)[4], const int&);
+        std::vector<Body> particles;
+
 };
 
 #endif
