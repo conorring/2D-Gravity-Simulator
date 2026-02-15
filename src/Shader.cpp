@@ -1,5 +1,4 @@
 #include "Shader.h"
-#include "Renderer.h"
 
 #include <GL/glew.h>
 
@@ -7,6 +6,8 @@
 #include<iostream>
 #include <sstream>
 #include <string>
+
+#include "GLutils.h"
 
 /********************************************************************/
 /*   functionality for creating a program from shader source code   */

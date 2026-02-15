@@ -1,17 +1,24 @@
-#include <GL/glew.h>        // access function pointers
-#include <GLFW/glfw3.h>     // manage windowing env
-
-#include "Renderer.h"
-#include "Shader.h"
+#include <GL/glew.h>        
+#include <GLFW/glfw3.h>   
+#include <glm/glm.hpp>  
+#include <glm/gtc/type_ptr.hpp>
 
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
 
-//#define DEBUG
+#include "Buffer.h"
+#include "BufferLayout.h"
+#include "GLutils.h"
+#include "ParticleSystem.h"
+#include "Renderer.h"
+#include "Shader.h"
+#include "VertexArray.h"
 
-constexpr float DT{0.001};
+constexpr int WINDOW_WIDTH{960};
+constexpr int WINDOW_HEIGHT{960};
+constexpr float dt{0.01};
 
 int main()
 {
@@ -25,7 +32,8 @@ int main()
     if (!glfwInit()) return -1;
 
     // create the window and terminate if error occurs
-    window = glfwCreateWindow(640, 480, "Gravity", NULL, NULL);
+    // first two arguments control window size in pixels
+    window = glfwCreateWindow(WINDOW_HEIGHT, WINDOW_WIDTH, "Particle Simulation", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -40,51 +48,49 @@ int main()
 
     /******************* done with setting up window stuff *********************/
 
-    System system;
-
-    // fix at centre
-    Body sun(1000, 0.0f);
-    Body earth(1, 0.0f, {0.75f, -0.5f}, {0.0f, 1.0f});  
-    Body earth2(1, 0.0f, {-0.75f, 0.5f}, {0.0f, -1.0f});
-
-    GLuint sun_vao{create_body_vao(0.1f)};
-    GLuint earth_vao{create_body_vao(0.05f)};
-
-    sun.set_vao(sun_vao);
-    earth.set_vao(earth_vao);
-    earth2.set_vao(earth_vao);
-
-    #ifdef DEBUG
-    std::cout << sun.get_vao() << std::endl;
-    std::cout << earth.get_vao() << std::endl;
-    #endif
-
-    system.add_body(sun);
-    system.add_body(earth);
-    system.add_body(earth2);
-
-    #ifdef DEBUG
-    std::cout << system.particles.size();
-    #endif
-
-    GLuint program{create_program("res/shaders/Body.shader")};
-    GLCall(glUseProgram(program));
-
-    GLCall(int location = glGetUniformLocation(program, "transformation"));
-    ASSERT(location != -1);
-
-    float transformation[4][4] { {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1} };
-
     
-    float* mat_ptr{ transformation[0] };
-    GLCall(glUniformMatrix4fv(location, 1, GL_FALSE, mat_ptr)); // GL_FALSE for column major order
+    // create particles
+    constexpr int no_particles{2};
+    System system(no_particles);
+    system.add_body(1.989e30f, 6.957e8f);
+    system.add_body(5.97e24f, 6.371e6f, {constants::AU, 0}, {constants::AU, -300});
+
+    // initialise buffers and vao
+    Buffer circle_vbo(GL_ARRAY_BUFFER, GL_STATIC_DRAW);
+    std::vector<Vertex> circle_vertices{generate_circle_vertices(100, WINDOW_WIDTH, WINDOW_HEIGHT)};
+    circle_vbo.add_data(static_cast<GLsizeiptr>(circle_vertices.size()*sizeof(Vertex)), circle_vertices.data());
+
+    VertexBufferLayout circle_layout;
+    circle_layout.push(GL_FLOAT, 2, GL_FALSE);
+
+    Buffer instance_vbo(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW);
+    GLsizeiptr size{no_particles*sizeof(Position)};
+    std::vector<float> data{-0.5f, 0.0f, 0.5f, 0.0f};
+    instance_vbo.add_data(size, data.data());
+
+    VertexBufferLayout instance_layout;
+    instance_layout.push(GL_FLOAT, 2, GL_FALSE);
+
+    VertexArray vao;
+    vao.add_buffer(circle_vbo, circle_layout, {0});
+    vao.add_buffer(instance_vbo, instance_layout, {1});
+    GLCall(glVertexAttribDivisor(1, 1));
+
+    // shader program
+    GLuint shader_id{create_program("res/shaders/SolarSystem.shader")};
+    GLCall(glUseProgram(shader_id));
+
+    GLCall(GLint projection_loc{glGetUniformLocation(shader_id, "projection")});
+    const glm::mat4 projection{1.0f};
+    GLCall(glUniformMatrix4fv(projection_loc, 1, false, glm::value_ptr(projection)));
 
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        system.draw_system(&transformation[0], location);
-        system.update_system(DT);
+        GLCall(glDrawArraysInstanced(GL_TRIANGLE_FAN,  0, 102, no_particles));
+        // system.update_system(dt);
+        // instance_vbo.add_data(size, system.get_positions().data());
 
         glfwSwapBuffers(window);
         glfwPollEvents();
