@@ -19,7 +19,7 @@
 
 constexpr int WINDOW_WIDTH{960};
 constexpr int WINDOW_HEIGHT{960};
-constexpr float dt{0.01};
+constexpr float dt{0.0001};
 
 int main()
 {
@@ -51,16 +51,16 @@ int main()
 
     
     // create particles
-    constexpr int no_particles{10};
+    constexpr int no_particles{1000};
     System system(no_particles);
 
     std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0.0, 1.0);
+    std::uniform_real_distribution<float> distribution(-1.0, 1.0);
     for(int i=0; i < no_particles; i++)
     {
         float x{distribution(generator)};
         float y{distribution(generator)};
-        system.add_body(1, 0.1, {x, y}, {x, y});
+        system.add_body(1, 0.05, {x, y}, {x, y});
     }
 
     // unit circle vertices

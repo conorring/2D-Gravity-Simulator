@@ -66,4 +66,9 @@ class System
         void update_system(float dt);
 };
 
+// helper functions
+void resolve_collision(Body&, Body&, float, float);
+float penetration(const Body&, const Body&);
+float bodies_distance(const Body&, const Body&);
+
 #endif

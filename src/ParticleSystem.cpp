@@ -83,6 +83,13 @@ void System::update_system(float dt)
         Body& body_i = particles[i];
         body_i.update_acceleration(forces[i]);
         body_i.update_position(dt);
+
+        Position pos_i{body_i.get_position()};
+        if(pos_i.y < -1.0f) pos_i.y = -1.0f;
+        if(pos_i.x < -1.0f) pos_i.x = -1.0f;
+        if(pos_i.x > 1.0f)  pos_i.x = 1.0f;
+
+        body_i.set_position(pos_i);
     }
 
     // then resolve collisions (pairwise)
@@ -95,7 +102,7 @@ void System::update_system(float dt)
 
             if(penetration(body_i, body_j) > 0.0f)
             {
-                //resolve_collision(body_i, body_j, dt);
+                resolve_collision(body_i, body_j, dt, 0.5f);
             }
         }
     }
@@ -105,7 +112,7 @@ void System::update_system(float dt)
 
 
 // helper functions not class member functions
-static void resolve_collision(Body& body_a, Body& body_b, const float dt, const float restitution)
+void resolve_collision(Body& body_a, Body& body_b, const float dt, const float restitution)
 {
     const Position pos_a = body_a.get_position();
     const Position pos_b = body_b.get_position();
@@ -159,7 +166,7 @@ static void resolve_collision(Body& body_a, Body& body_b, const float dt, const 
     body_b.set_prev_position({body_b.get_position().x - new_vel_b.x * dt, body_b.get_position().y - new_vel_b.y * dt});
 }
 
-static bool penetration(const Body& body1, const Body& body2)
+float penetration(const Body& body1, const Body& body2)
 {
     float r1{body1.get_radius()};
     float r2{body2.get_radius()};
@@ -168,7 +175,7 @@ static bool penetration(const Body& body1, const Body& body2)
     return r1+r2-dist;
 }
 
-static float bodies_distance(const Body& body1, const Body& body2)
+float bodies_distance(const Body& body1, const Body& body2)
 {
     float dist, dist_x, dist_y;
 

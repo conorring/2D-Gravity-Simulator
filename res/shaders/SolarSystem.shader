@@ -5,6 +5,6 @@ layout(location=1) in vec2 instance_position;
 
 void main()
 {   
-    vec2 actual_position = 0.1*vertex_position + instance_position;
+    vec2 actual_position = 0.005*vertex_position + instance_position;
     gl_Position = vec4(actual_position, 0.0, 1.0);
 }
