@@ -36,8 +36,13 @@ class Body
     public:
         Body(float mass, float radius, Position position={0.0f, 0.0f}, Position prev_position={0.0f, 0.0f}, Acceleration acceleration={0.0f, 0.0f});
 
-        float get_mass() const {return m_mass;}
-        Position get_position() const {return m_position;}
+        float get_mass() const { return m_mass; }
+        Position get_position() const { return m_position; }
+        Position get_prev_position() const { return m_prev_position; }
+        float get_radius() const { return m_radius; }
+
+        void set_position(Position position) { m_position = position; }
+        void set_prev_position(Position prev_position) { m_prev_position = prev_position; }
 
         void update_position(float dt);
         void update_acceleration(Force force);
@@ -56,6 +61,8 @@ class System
         std::vector<Position> get_positions() const;
 
         void add_body(float mass, float radius, Position position={0.0f, 0.0f}, Position prev_position={0.0f, 0.0f}, Acceleration acceleration={0.0f, 0.0f});
+        void update_forces();
+        void update_accelerations();
         void update_system(float dt);
 };
 

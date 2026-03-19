@@ -17,8 +17,8 @@ void Body::update_position(float dt)
 {
     // verlet integration
     Position next_position{};
-    next_position.x = 2*m_position.x + m_acceleration.x*dt*dt + m_prev_position.x;
-    next_position.y = 2*m_position.y + m_acceleration.y*dt*dt + m_prev_position.y;
+    next_position.x = 2*m_position.x + m_acceleration.x*dt*dt - m_prev_position.x;
+    next_position.y = 2*m_position.y + m_acceleration.y*dt*dt - m_prev_position.y;
 
     m_prev_position = m_position;
     m_position = next_position;
@@ -44,11 +44,13 @@ System::System(int no_particles)
 void System::add_body(float mass, float radius, Position position, Position prev_position, Acceleration acceleration)
 {
     particles.emplace_back(mass, radius, position, prev_position, acceleration);
+    forces.emplace_back(0.0f, 0.0f);
 }
 
 std::vector<Position> System::get_positions() const
 {
     std::vector<Position> positions;
+    positions.reserve(particles.size());
     for(auto& particle : particles)
     {
         positions.push_back({particle.get_position()});
@@ -57,43 +59,122 @@ std::vector<Position> System::get_positions() const
     return positions;
 }
 
+void System::update_forces()
+{
+    if(forces.size() != particles.size())
+    {
+        forces.resize(particles.size());
+    }
+
+    for(std::size_t i{0}; i < particles.size(); i++)
+    {
+        forces[i] = {0.0f, -9.81f * particles[i].get_mass()};
+    }
+}
+
+
 void System::update_system(float dt)
 {
-    std::size_t system_size{particles.size()};
+    update_forces();
 
-    // need to reset to 0 as we are accumulating total force by summing over particles
-    std::fill(forces.begin(), forces.end(), Force {0.0f, 0.0f});
-
-    for(std::size_t i{0}; i < system_size; ++i)
+    // first integrate positions using Verlet
+    for(std::size_t i{0}; i < particles.size(); i++)
     {
-        Force& force1{forces[i]};
-        Body& body1{particles[i]};
-
-        for(std::size_t j=i+1; j < system_size; ++j)
-        {
-            Body& body2{particles[j]};
-
-            float dist, dist_x, dist_y;
-
-            dist_x = body2.get_position().x - body1.get_position().x;
-            dist_y = body2.get_position().y - body1.get_position().y;
-            dist = std::hypotf(dist_x, dist_y);
-
-            const float softening{1e-4};
-            dist += softening;
-
-            float mag_f{ static_cast<float>(constants::GRAVITATION_CONSTANT*body1.get_mass()*body2.get_mass() / (dist*dist)) }; // Newtons law of gravitation
-
-            Force& force2{forces[j]};
-
-            force1.x += mag_f * (dist_x / dist);
-            force1.y += mag_f * (dist_y / dist);
-            force2.x -= mag_f * (dist_x / dist);
-            force2.y -= mag_f * (dist_y / dist);
-        }
-        
-        // can update inside loop as bodies after i already account for force from body i
-        body1.update_acceleration(force1);
-        body1.update_position(dt);
+        Body& body_i = particles[i];
+        body_i.update_acceleration(forces[i]);
+        body_i.update_position(dt);
     }
+
+    // then resolve collisions (pairwise)
+    for(std::size_t i{0}; i < particles.size(); i++)
+    {
+        for(std::size_t j{i + 1}; j < particles.size(); j++)
+        {
+            Body& body_i = particles[i];
+            Body& body_j = particles[j];
+
+            if(penetration(body_i, body_j) > 0.0f)
+            {
+                //resolve_collision(body_i, body_j, dt);
+            }
+        }
+    }
+}
+
+
+
+
+// helper functions not class member functions
+static void resolve_collision(Body& body_a, Body& body_b, const float dt, const float restitution)
+{
+    const Position pos_a = body_a.get_position();
+    const Position pos_b = body_b.get_position();
+
+    Position delta{pos_b.x - pos_a.x, pos_b.y - pos_a.y};
+    float dist = std::hypotf(delta.x, delta.y);
+
+    const float r_sum = body_a.get_radius() + body_b.get_radius();
+    const float penetration_depth = r_sum - dist;
+    if(penetration_depth <= 0.0f) return;
+
+    // normalize
+    delta.x /= dist;
+    delta.y /= dist;
+
+    // separate bodies along collision normal
+    const float half_penetration = 0.5f * penetration_depth;
+    body_a.set_position({pos_a.x - delta.x * half_penetration, pos_a.y - delta.y * half_penetration});
+    body_b.set_position({pos_b.x + delta.x * half_penetration, pos_b.y + delta.y * half_penetration});
+
+    // estimate velocities from Verlet positions
+    // think this should be done before we separate bodies along collision line
+    const Position prev_a = body_a.get_prev_position();
+    const Position prev_b = body_b.get_prev_position();
+    Velocity vel_a{(body_a.get_position().x - prev_a.x) / dt, (body_a.get_position().y - prev_a.y) / dt};
+    Velocity vel_b{(body_b.get_position().x - prev_b.x) / dt, (body_b.get_position().y - prev_b.y) / dt};
+
+    // relative velocity along normal
+    const float rel_vel = (vel_b.x - vel_a.x) * delta.x + (vel_b.y - vel_a.y) * delta.y;
+
+    if(rel_vel > 0.0f)
+    {
+        // already separating
+        return;
+    }
+
+
+    const float inv_mass_a = 1.0f / body_a.get_mass();
+    const float inv_mass_b = 1.0f / body_b.get_mass();
+
+    const float impulse = -(1.0f + restitution) * rel_vel / (inv_mass_a + inv_mass_b);
+
+    const float impulse_a = impulse * inv_mass_a;
+    const float impulse_b = impulse * inv_mass_b;
+
+    // apply impulses by adjusting previous positions to reflect the new velocity
+    const Position new_vel_a{vel_a.x - impulse_a * delta.x, vel_a.y - impulse_a * delta.y};
+    const Position new_vel_b{vel_b.x + impulse_b * delta.x, vel_b.y + impulse_b * delta.y};
+
+    body_a.set_prev_position({body_a.get_position().x - new_vel_a.x * dt, body_a.get_position().y - new_vel_a.y * dt});
+    body_b.set_prev_position({body_b.get_position().x - new_vel_b.x * dt, body_b.get_position().y - new_vel_b.y * dt});
+}
+
+static bool penetration(const Body& body1, const Body& body2)
+{
+    float r1{body1.get_radius()};
+    float r2{body2.get_radius()};
+    float dist{bodies_distance(body1, body2)};
+
+    return r1+r2-dist;
+}
+
+static float bodies_distance(const Body& body1, const Body& body2)
+{
+    float dist, dist_x, dist_y;
+
+    dist_x = body2.get_position().x - body1.get_position().x;
+    dist_y = body2.get_position().y - body1.get_position().y;
+    dist = std::hypotf(dist_x, dist_y);
+
+    return dist;
 }
